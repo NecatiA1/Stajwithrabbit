@@ -27,7 +27,7 @@ def mesaj_gonder():
         channel.basic_publish(exchange='',
                               routing_key=RABBITMQ_QUEUE,
                               body=json.dumps(user_message))
-        connection.close()
+        #connection.close()
         return jsonify({"status": "ok", "message": "Mesaj başarıyla gönderildi."})
     except Exception as e:
         print(f"Hata: {e}")
