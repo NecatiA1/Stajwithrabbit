@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RabbitMQ Mesajlaşma</title>
+    <style>
+        body { font-family: sans-serif; max-width: 600px; margin: 50px auto; background-color: #f0f2f5; }
+        h1, h2 { color: #1c1e21; }
+        #chat-box { border: 1px solid #ccc; height: 300px; overflow-y: scroll; padding: 10px; background-color: #fff; margin-bottom: 20px; border-radius: 8px; }
+        .message { margin-bottom: 10px; padding: 8px; border-radius: 5px; }
+        .message .sender { font-weight: bold; color: #007bff; }
+        #message-form { display: flex; }
+        #username-input, #message-input { flex-grow: 1; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+        #username-input { margin-right: 10px; flex-grow: 0; width: 120px;}
+        button { padding: 10px 15px; background-color: #007bff; color: white; border: none; cursor: pointer; border-radius: 5px; }
+        button:hover { background-color: #0056b3; }
+    </style>
+</head>
+<body>
+
+    <h1>RabbitMQ Mesajlaşma Projesi</h1>
+    <h2>(WebSocket YOK - Polling Kullanılıyor)</h2>
+
+    <div id="chat-box">
+        </div>
+
+    <form id="message-form">
+        <input type="text" id="username-input" placeholder="Kullanıcı Adı" required>
+        <input type="text" id="message-input" placeholder="Mesajını yaz..." required>
+        <button type="submit">Gönder</button>
+    </form>
+
+    <script>
+        // Backend sunucumuzun adresi
+        const API_URL = 'http://localhost:5000';
+
+        const messageForm = document.getElementById('message-form');
+        const usernameInput = document.getElementById('username-input');
+        const messageInput = document.getElementById('message-input');
+        const chatBox = document.getElementById('chat-box');
+
+        // 1. MESAJ GÖNDERME İŞLEMİ
+        messageForm.addEventListener('submit', function(event) {
+            // Formun sayfayı yenilemesini engelle
+            event.preventDefault(); 
+            
+            const username = usernameInput.value;
+            const message = messageInput.value;
+
+            // Eğer kullanıcı adı veya mesaj boşsa gönderme
+            if (!username || !message) {
+                alert('Kullanıcı adı ve mesaj boş olamaz!');
+                return;
+            }
+
+            // Backend'deki /gonder adresine POST isteği gönderiyoruz
+            fetch(API_URL + '/gonder', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                // Göndereceğimiz veriyi JSON formatına çeviriyoruz
+                body: JSON.stringify({ sender: username, text: message })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log(data.message); // Başarılı mesajını konsola yazdır
+                messageInput.value = ''; // Mesaj kutusunu temizle
+            })
+            .catch(error => console.error('Hata:', error));
+        });
+
+        // 2. MESAJ ALMA İŞLEMİ (POLLING)
+        // Bu fonksiyon, yeni mesajları almak için sunucuya sürekli istek atacak
+        function checkForMessages() {
+            // Backend'deki /mesaj-al adresine GET isteği gönderiyoruz
+            fetch(API_URL + '/mesaj-al')
+                .then(response => response.json())
+                .then(data => {
+                    // Eğer sunucu "ok" durumunu ve bir mesaj döndürdüyse
+                    if (data.status === 'ok' && data.message) {
+                        // Gelen mesajı ekrana yazdıran fonksiyonu çağır
+                        displayMessage(data.message);
+                    }
+                    // Eğer mesaj yoksa veya başka bir durum varsa hiçbir şey yapma
+                })
+                .catch(error => console.error('Mesaj alınırken hata:', error));
+        }
+
+        // Gelen mesajı HTML olarak ekrana ekleyen fonksiyon
+        function displayMessage(message) {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('message');
+            
+            // Mesajın içeriğini HTML olarak hazırla
+            messageElement.innerHTML = `<span class="sender">${message.sender}:</span> ${message.text}`;
+            
+            // Yeni mesajı mesaj kutusuna ekle
+            chatBox.appendChild(messageElement);
+            
+            // Mesaj kutusunu en aşağıya kaydır
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        // Her 2 saniyede bir (2000 milisaniye) checkForMessages fonksiyonunu çalıştır.
+        // İşte POLLING (Sürekli Sorgulama) dediğimiz olay tam olarak budur.
+        setInterval(checkForMessages, 2000);
+
+    </script>
+
+</body>
+</html>
